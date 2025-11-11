@@ -1,237 +1,283 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { Book, Genre, User, Notification } from './types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Book, User, Genre, Notification } from './types';
 import { initialBooks } from './data/mockData';
 import { initialUsers } from './data/mockUserData';
 import Header from './components/Header';
 import ControlPanel from './components/ControlPanel';
-import BookList from './components/BookList';
-import BookFormModal from './components/BookFormModal';
 import UserControlPanel from './components/UserControlPanel';
+import BookList from './components/BookList';
 import UserList from './components/UserList';
+import BookFormModal from './components/BookFormModal';
 import UserFormModal from './components/UserFormModal';
 import SelectUserModal from './components/SelectUserModal';
-import { PlusIcon } from './components/icons/PlusIcon';
+import UserDetailModal from './components/UserDetailModal';
 
-const App: React.FC = () => {
+// Helper to calculate fines, assuming a simple logic
+const calculateFine = (dueDate: string): number => {
+    const due = new Date(dueDate);
+    const today = new Date();
+    if (today <= due) return 0;
+    const diffTime = today.getTime() - due.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays * 0.5; // $0.50 per day overdue
+};
+
+function App() {
   const [books, setBooks] = useState<Book[]>(initialBooks);
   const [users, setUsers] = useState<User[]>(initialUsers);
-  const [view, setView] = useState<'books' | 'users'>('books');
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [currentView, setCurrentView] = useState<'books' | 'users'>('books');
 
-  // Book state
-  const [bookSearchTerm, setBookSearchTerm] = useState('');
+  // State for Book view
+  const [searchTerm, setSearchTerm] = useState('');
   const [genreFilter, setGenreFilter] = useState<Genre | 'all'>('all');
   const [availabilityFilter, setAvailabilityFilter] = useState<'all' | 'available' | 'borrowed'>('all');
-  const [isBookModalOpen, setIsBookModalOpen] = useState(false);
-  const [editingBook, setEditingBook] = useState<Book | null>(null);
 
-  // User state
+  // State for User view
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'student' | 'faculty'>('all');
-  const [userSortOption, setUserSortOption] = useState<'name-asc' | 'name-desc' | 'fines-asc' | 'fines-desc'>('name-asc');
-  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
-
-  // Borrowing state
-  const [isSelectUserModalOpen, setIsSelectUserModalOpen] = useState(false);
-  const [bookToBorrow, setBookToBorrow] = useState<Book | null>(null);
+  const [sortOption, setSortOption] = useState<'name-asc' | 'name-desc' | 'fines-asc' | 'fines-desc'>('name-asc');
   
-  // Notification state
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  // Modal states
+  const [isBookFormOpen, setIsBookFormOpen] = useState(false);
+  const [editingBook, setEditingBook] = useState<Book | null>(null);
+  const [isUserFormOpen, setIsUserFormOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [isSelectUserOpen, setIsSelectUserOpen] = useState(false);
+  const [borrowingBook, setBorrowingBook] = useState<Book | null>(null);
+  const [isUserDetailOpen, setIsUserDetailOpen] = useState(false);
+  const [viewingUser, setViewingUser] = useState<User | null>(null);
 
-  const checkForOverdueBooks = useCallback(() => {
-      const overdueNotifications: Notification[] = [];
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      books.forEach(book => {
-          if (book.borrowedById && book.dueDate) {
-              const dueDate = new Date(book.dueDate);
-              dueDate.setHours(0,0,0,0);
-              if (today > dueDate) {
-                  const daysOverdue = Math.ceil((today.getTime() - dueDate.getTime()) / (1000 * 3600 * 24));
-                  const user = users.find(u => u.id === book.borrowedById);
-                  if (user) {
-                      overdueNotifications.push({
-                          id: book.id,
-                          bookTitle: book.title,
-                          userName: user.name,
-                          daysOverdue: daysOverdue,
-                      });
-                  }
-              }
-          }
-      });
-      setNotifications(overdueNotifications);
+  // This effect now only handles generating notifications for currently overdue books.
+  // Fines are calculated and permanently added to a user's account upon return.
+  useEffect(() => {
+    const newNotifications: Notification[] = [];
+    books.forEach(book => {
+        if (book.borrowedById && book.dueDate) {
+            const fine = calculateFine(book.dueDate);
+            if (fine > 0) {
+                const user = users.find(u => u.id === book.borrowedById);
+                if (user) {
+                    const daysOverdue = Math.round(fine / 0.5);
+                    newNotifications.push({
+                        id: book.id,
+                        bookTitle: book.title,
+                        userName: user.name,
+                        daysOverdue,
+                    });
+                }
+            }
+        }
+    });
+    setNotifications(newNotifications);
   }, [books, users]);
 
-  useEffect(() => {
-    checkForOverdueBooks();
-  }, [checkForOverdueBooks]);
-
-
-  // Book Management
-  const handleAddBook = (book: Omit<Book, 'id' | 'borrowedById' | 'dueDate'>) => {
-    setBooks(prev => [...prev, { ...book, id: Date.now(), borrowedById: null, dueDate: null }]);
+  const handleClearNotifications = () => {
+    setNotifications([]);
   };
 
-  const handleUpdateBook = (updatedBook: Book) => {
-    setBooks(prev => prev.map(b => (b.id === updatedBook.id ? updatedBook : b)));
+  // Book CRUD and actions
+  const handleSaveBook = (bookData: Omit<Book, 'id' | 'borrowedById' | 'dueDate'> & { id?: number }) => {
+    if (bookData.id) {
+      setBooks(books.map(b => b.id === bookData.id ? { ...b, ...bookData } : b));
+    } else {
+      const newBook: Book = {
+        ...bookData,
+        id: Date.now(),
+        borrowedById: null,
+        dueDate: null,
+      };
+      setBooks([newBook, ...books]);
+    }
   };
 
   const handleDeleteBook = (id: number) => {
     if (window.confirm('Are you sure you want to delete this book?')) {
-        setBooks(prev => prev.filter(b => b.id !== id));
-        setNotifications(prev => prev.filter(n => n.id !== id));
+        setBooks(books.filter(b => b.id !== id));
     }
   };
 
-  // User Management
-  const handleAddUser = (user: Omit<User, 'id' | 'fines'>) => {
-    setUsers(prev => [...prev, { ...user, id: Date.now(), fines: 0 }]);
+  const handleBorrowBook = (book: Book) => {
+    setBorrowingBook(book);
+    setIsSelectUserOpen(true);
   };
+  
+  const handleSelectUserForBorrow = (userId: number) => {
+    if (borrowingBook) {
+        const user = users.find(u => u.id === userId);
+        const loanDuration = user?.role === 'faculty' ? 30 : 14; // 30 days for faculty, 14 for students
+        const today = new Date();
+        const dueDate = new Date();
+        dueDate.setDate(today.getDate() + loanDuration);
 
-  const handleUpdateUser = (updatedUser: User) => {
-    setUsers(prev => prev.map(u => (u.id === updatedUser.id ? updatedUser : u)));
-  };
+        // Update book status
+        setBooks(books.map(b => b.id === borrowingBook.id ? {
+            ...b,
+            borrowedById: userId,
+            dueDate: dueDate.toISOString().split('T')[0],
+        } : b));
 
-  const handleDeleteUser = (id: number) => {
-     if (books.some(b => b.borrowedById === id)) {
-        alert("Cannot delete user. They have books currently borrowed.");
-        return;
-      }
-    if (window.confirm('Are you sure you want to delete this user?')) {
-        setUsers(prev => prev.filter(u => u.id !== id));
+        // Add to user's borrowing history
+        setUsers(users.map(u => u.id === userId ? {
+            ...u,
+            borrowingHistory: [
+                ...u.borrowingHistory,
+                {
+                    bookId: borrowingBook.id,
+                    bookTitle: borrowingBook.title,
+                    borrowedDate: today.toISOString().split('T')[0],
+                    returnedDate: null
+                }
+            ]
+        } : u));
     }
-  };
-
-  // Borrowing and Returning
-  const handleInitiateBorrow = (book: Book) => {
-    setBookToBorrow(book);
-    setIsSelectUserModalOpen(true);
-  };
-
-  const handleConfirmBorrow = (userId: number) => {
-    if (!bookToBorrow) return;
-    const user = users.find(u => u.id === userId);
-    if (!user) return;
-
-    const borrowedCount = books.filter(b => b.borrowedById === userId).length;
-    const limit = user.role === 'faculty' ? 10 : 5;
-
-    if (borrowedCount >= limit) {
-      alert(`${user.name} has reached their borrowing limit of ${limit} books.`);
-      return;
-    }
-
-    const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + (user.role === 'faculty' ? 30 : 14));
-
-    setBooks(books.map(b => b.id === bookToBorrow.id ? { ...b, borrowedById: userId, dueDate: dueDate.toISOString().split('T')[0] } : b));
-    setIsSelectUserModalOpen(false);
-    setBookToBorrow(null);
+    setIsSelectUserOpen(false);
+    setBorrowingBook(null);
   };
 
   const handleReturnBook = (book: Book) => {
-    if (!book.borrowedById || !book.dueDate) return;
-    
-    let fineIncurred = 0;
-    const today = new Date();
-    const dueDate = new Date(book.dueDate);
-    today.setHours(0,0,0,0);
-    
-    if (today > dueDate) {
-        const daysOverdue = Math.ceil((today.getTime() - dueDate.getTime()) / (1000 * 3600 * 24));
-        fineIncurred = daysOverdue * 0.50; // $0.50 per day
+    const today = new Date().toISOString().split('T')[0];
+
+    // Calculate and apply fine if the book is overdue upon return
+    if (book.borrowedById && book.dueDate) {
+      const fine = calculateFine(book.dueDate);
+      if (fine > 0) {
+        setUsers(prevUsers =>
+          prevUsers.map(user =>
+            user.id === book.borrowedById
+              ? { ...user, fines: user.fines + fine }
+              : user
+          )
+        );
+      }
+      
+      // Update borrowing history with return date
+      setUsers(prevUsers => prevUsers.map(user => {
+        if (user.id === book.borrowedById) {
+            return {
+                ...user,
+                borrowingHistory: user.borrowingHistory.map(record => 
+                    (record.bookId === book.id && record.returnedDate === null)
+                        ? { ...record, returnedDate: today }
+                        : record
+                )
+            };
+        }
+        return user;
+      }));
     }
 
-    if (fineIncurred > 0) {
-        setUsers(users.map(u => u.id === book.borrowedById ? { ...u, fines: u.fines + fineIncurred } : u));
-        alert(`Book is overdue. A fine of $${fineIncurred.toFixed(2)} has been added.`);
+    // Mark the book as returned by clearing borrower info and due date
+    setBooks(books.map(b => 
+        b.id === book.id 
+            ? { ...b, borrowedById: null, dueDate: null } 
+            : b
+    ));
+  };
+  
+  // User CRUD and actions
+   const handleSaveUser = (userData: Omit<User, 'id' | 'fines' | 'borrowingHistory'> & { id?: number }) => {
+    if (userData.id) {
+        setUsers(users.map(u => u.id === userData.id ? { ...u, ...userData } : u));
+    } else {
+        const newUser: User = {
+            ...userData,
+            id: Date.now(),
+            fines: 0,
+            borrowingHistory: []
+        };
+        setUsers([newUser, ...users]);
     }
+  };
 
-    setBooks(books.map(b => b.id === book.id ? { ...b, borrowedById: null, dueDate: null } : b));
-    setNotifications(prev => prev.filter(n => n.id !== book.id));
+  const handleDeleteUser = (id: number) => {
+    if (books.some(b => b.borrowedById === id)) {
+        alert("Cannot delete user with borrowed books.");
+        return;
+    }
+    if (window.confirm('Are you sure you want to delete this user?')) {
+        setUsers(users.filter(u => u.id !== id));
+    }
+  };
+  
+  const handleViewUserDetails = (user: User) => {
+    setViewingUser(user);
+    setIsUserDetailOpen(true);
+  };
+
+  const handlePayFines = (userId: number) => {
+    setUsers(users.map(user => user.id === userId ? { ...user, fines: 0 } : user));
   };
 
 
-  // Modals
-  const openAddBookModal = () => { setEditingBook(null); setIsBookModalOpen(true); };
-  const openEditBookModal = (book: Book) => { setEditingBook(book); setIsBookModalOpen(true); };
-  const closeBookModal = useCallback(() => { setIsBookModalOpen(false); setEditingBook(null); }, []);
-
-  const openAddUserModal = () => { setEditingUser(null); setIsUserModalOpen(true); };
-  const openEditUserModal = (user: User) => { setEditingUser(user); setIsUserModalOpen(true); };
-  const closeUserModal = useCallback(() => { setIsUserModalOpen(false); setEditingUser(null); }, []);
-
-  // Filtering
+  // Filtering and Sorting Logic
   const filteredBooks = useMemo(() => {
     return books.filter(book => {
-      const matchesSearch =
-        book.title.toLowerCase().includes(bookSearchTerm.toLowerCase()) ||
-        book.author.toLowerCase().includes(bookSearchTerm.toLowerCase());
+      const matchesSearch = book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        book.author.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesGenre = genreFilter === 'all' || book.genre === genreFilter;
-      const matchesAvailability =
-        availabilityFilter === 'all' ||
+      const matchesAvailability = availabilityFilter === 'all' ||
         (availabilityFilter === 'available' && book.borrowedById === null) ||
         (availabilityFilter === 'borrowed' && book.borrowedById !== null);
-      
       return matchesSearch && matchesGenre && matchesAvailability;
     });
-  }, [books, bookSearchTerm, genreFilter, availabilityFilter]);
+  }, [books, searchTerm, genreFilter, availabilityFilter]);
 
-  const filteredUsers = useMemo(() => {
+  const filteredAndSortedUsers = useMemo(() => {
     const filtered = users.filter(user => {
-        const matchesSearch = 
-            user.name.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
-            user.id.toString().includes(userSearchTerm);
-        const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-
-        return matchesSearch && matchesRole;
+      const matchesSearch = user.name.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+        user.id.toString().includes(userSearchTerm);
+      const matchesRole = roleFilter === 'all' || user.role === roleFilter;
+      return matchesSearch && matchesRole;
     });
 
-    return filtered.sort((a, b) => {
-        switch (userSortOption) {
+    return [...filtered].sort((a, b) => {
+        switch(sortOption) {
+            case 'name-desc': return b.name.localeCompare(a.name);
+            case 'fines-asc': return a.fines - b.fines;
+            case 'fines-desc': return b.fines - a.fines;
             case 'name-asc':
-                return a.name.localeCompare(b.name);
-            case 'name-desc':
-                return b.name.localeCompare(a.name);
-            case 'fines-asc':
-                return a.fines - b.fines;
-            case 'fines-desc':
-                return b.fines - a.fines;
-            default:
-                return a.name.localeCompare(b.name);
+            default: return a.name.localeCompare(b.name);
         }
     });
-  }, [users, userSearchTerm, roleFilter, userSortOption]);
+  }, [users, userSearchTerm, roleFilter, sortOption]);
 
+  const openBookForm = (book: Book | null = null) => {
+    setEditingBook(book);
+    setIsBookFormOpen(true);
+  };
+  
+  const openUserForm = (user: User | null = null) => {
+    setEditingUser(user);
+    setIsUserFormOpen(true);
+  };
 
   return (
-    <div className="bg-gray-50 min-h-screen font-sans text-gray-800">
+    <div className="bg-gray-50 min-h-screen">
       <Header 
-        currentView={view} 
-        onNavigate={setView} 
+        currentView={currentView} 
+        onNavigate={setCurrentView}
         notifications={notifications}
-        onClearNotifications={() => setNotifications([])}
+        onClearNotifications={handleClearNotifications}
       />
-      <main className="container mx-auto p-4 md:p-8">
-        {view === 'books' ? (
+      <main className="container mx-auto px-4 md:px-8 py-6">
+        {currentView === 'books' ? (
           <>
             <ControlPanel
-              searchTerm={bookSearchTerm}
-              onSearchChange={setBookSearchTerm}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
               genreFilter={genreFilter}
               onGenreChange={setGenreFilter}
               availabilityFilter={availabilityFilter}
               onAvailabilityChange={setAvailabilityFilter}
-              onAddBookClick={openAddBookModal}
+              onAddBookClick={() => openBookForm()}
             />
             <BookList
               books={filteredBooks}
               users={users}
-              onEdit={openEditBookModal}
+              onEdit={openBookForm}
               onDelete={handleDeleteBook}
-              onBorrow={handleInitiateBorrow}
+              onBorrow={handleBorrowBook}
               onReturn={handleReturnBook}
             />
           </>
@@ -242,55 +288,60 @@ const App: React.FC = () => {
               onSearchChange={setUserSearchTerm}
               roleFilter={roleFilter}
               onRoleChange={setRoleFilter}
-              sortOption={userSortOption}
-              onSortChange={setUserSortOption}
-              onAddUserClick={openAddUserModal}
+              sortOption={sortOption}
+              onSortChange={setSortOption}
+              onAddUserClick={() => openUserForm()}
             />
             <UserList
-                users={filteredUsers}
+                users={filteredAndSortedUsers}
                 books={books}
-                onEdit={openEditUserModal}
+                onEdit={openUserForm}
                 onDelete={handleDeleteUser}
+                onViewDetails={handleViewUserDetails}
             />
           </>
         )}
-        
-        {isBookModalOpen && (
-          <BookFormModal
-            isOpen={isBookModalOpen}
-            onClose={closeBookModal}
-            onSave={editingBook ? handleUpdateBook : handleAddBook}
-            initialData={editingBook}
-          />
-        )}
-        {isUserModalOpen && (
-          <UserFormModal
-            isOpen={isUserModalOpen}
-            onClose={closeUserModal}
-            onSave={editingUser ? handleUpdateUser : handleAddBook}
-            initialData={editingUser}
-          />
-        )}
-        {isSelectUserModalOpen && (
-            <SelectUserModal
-                isOpen={isSelectUserModalOpen}
-                onClose={() => setIsSelectUserModalOpen(false)}
-                users={users}
-                books={books}
-                onSelectUser={handleConfirmBorrow}
-            />
-        )}
-
       </main>
-      <button
-          onClick={view === 'books' ? openAddBookModal : openAddUserModal}
-          className="md:hidden fixed bottom-6 right-6 bg-indigo-600 text-white p-4 rounded-full shadow-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-transform transform hover:scale-110"
-          aria-label={view === 'books' ? 'Add new book' : 'Add new user'}
-      >
-          <PlusIcon className="h-6 w-6" />
-      </button>
+      
+      {isBookFormOpen && (
+        <BookFormModal
+          isOpen={isBookFormOpen}
+          onClose={() => setIsBookFormOpen(false)}
+          onSave={handleSaveBook}
+          initialData={editingBook}
+        />
+      )}
+      
+      {isUserFormOpen && (
+        <UserFormModal
+            isOpen={isUserFormOpen}
+            onClose={() => setIsUserFormOpen(false)}
+            onSave={handleSaveUser}
+            initialData={editingUser}
+        />
+      )}
+      
+      {isSelectUserOpen && (
+        <SelectUserModal
+            isOpen={isSelectUserOpen}
+            onClose={() => setIsSelectUserOpen(false)}
+            users={users}
+            books={books}
+            onSelectUser={handleSelectUserForBorrow}
+        />
+      )}
+
+      {isUserDetailOpen && viewingUser && (
+        <UserDetailModal
+            isOpen={isUserDetailOpen}
+            onClose={() => setIsUserDetailOpen(false)}
+            user={viewingUser}
+            books={books}
+            onPayFines={handlePayFines}
+        />
+      )}
     </div>
   );
-};
+}
 
 export default App;

@@ -2,6 +2,13 @@ import { GENRES } from './constants';
 
 export type Genre = typeof GENRES[number];
 
+export interface BorrowingRecord {
+  bookId: number;
+  bookTitle: string;
+  borrowedDate: string;
+  returnedDate: string | null;
+}
+
 export interface Book {
   id: number;
   title: string;
@@ -17,10 +24,11 @@ export interface User {
   name: string;
   role: 'student' | 'faculty';
   fines: number;
+  borrowingHistory: BorrowingRecord[];
 }
 
 export interface Notification {
-  id: number; // Corresponds to book ID
+  id: number;
   bookTitle: string;
   userName: string;
   daysOverdue: number;

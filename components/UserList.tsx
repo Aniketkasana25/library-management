@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { User, Book } from '../types';
 import UserCard from './UserCard';
@@ -7,9 +8,10 @@ interface UserListProps {
   books: Book[];
   onEdit: (user: User) => void;
   onDelete: (id: number) => void;
+  onViewDetails: (user: User) => void;
 }
 
-const UserList: React.FC<UserListProps> = ({ users, books, onEdit, onDelete }) => {
+const UserList: React.FC<UserListProps> = ({ users, books, onEdit, onDelete, onViewDetails }) => {
   if (users.length === 0) {
     return (
       <div className="text-center py-16">
@@ -28,6 +30,7 @@ const UserList: React.FC<UserListProps> = ({ users, books, onEdit, onDelete }) =
           books={books}
           onEdit={onEdit}
           onDelete={onDelete}
+          onViewDetails={onViewDetails}
         />
       ))}
     </div>
