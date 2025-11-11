@@ -27,6 +27,7 @@ const App: React.FC = () => {
   // User state
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'student' | 'faculty'>('all');
+  const [userSortOption, setUserSortOption] = useState<'name-asc' | 'name-desc' | 'fines-asc' | 'fines-desc'>('name-asc');
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
@@ -179,7 +180,7 @@ const App: React.FC = () => {
   }, [books, bookSearchTerm, genreFilter, availabilityFilter]);
 
   const filteredUsers = useMemo(() => {
-    return users.filter(user => {
+    const filtered = users.filter(user => {
         const matchesSearch = 
             user.name.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
             user.id.toString().includes(userSearchTerm);
@@ -187,7 +188,22 @@ const App: React.FC = () => {
 
         return matchesSearch && matchesRole;
     });
-  }, [users, userSearchTerm, roleFilter]);
+
+    return filtered.sort((a, b) => {
+        switch (userSortOption) {
+            case 'name-asc':
+                return a.name.localeCompare(b.name);
+            case 'name-desc':
+                return b.name.localeCompare(a.name);
+            case 'fines-asc':
+                return a.fines - b.fines;
+            case 'fines-desc':
+                return b.fines - a.fines;
+            default:
+                return a.name.localeCompare(b.name);
+        }
+    });
+  }, [users, userSearchTerm, roleFilter, userSortOption]);
 
 
   return (
@@ -226,6 +242,8 @@ const App: React.FC = () => {
               onSearchChange={setUserSearchTerm}
               roleFilter={roleFilter}
               onRoleChange={setRoleFilter}
+              sortOption={userSortOption}
+              onSortChange={setUserSortOption}
               onAddUserClick={openAddUserModal}
             />
             <UserList

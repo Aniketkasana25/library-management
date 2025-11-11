@@ -8,6 +8,8 @@ interface UserControlPanelProps {
   onSearchChange: (term: string) => void;
   roleFilter: 'all' | 'student' | 'faculty';
   onRoleChange: (role: 'all' | 'student' | 'faculty') => void;
+  sortOption: 'name-asc' | 'name-desc' | 'fines-asc' | 'fines-desc';
+  onSortChange: (option: 'name-asc' | 'name-desc' | 'fines-asc' | 'fines-desc') => void;
   onAddUserClick: () => void;
 }
 
@@ -16,12 +18,14 @@ const UserControlPanel: React.FC<UserControlPanelProps> = ({
   onSearchChange,
   roleFilter,
   onRoleChange,
+  sortOption,
+  onSortChange,
   onAddUserClick,
 }) => {
   return (
     <div className="bg-white p-4 rounded-lg shadow-sm mb-6 md:mb-8 sticky top-20 z-10">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className="relative md:col-span-2 lg:col-span-1">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="relative">
           <input
             type="text"
             placeholder="Search by name or ID..."
@@ -44,15 +48,25 @@ const UserControlPanel: React.FC<UserControlPanelProps> = ({
           <option value="faculty">Faculty</option>
         </select>
         
-        <div className="hidden md:flex justify-end">
-            <button
-                onClick={onAddUserClick}
-                className="flex items-center bg-indigo-600 text-white font-semibold px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
-            >
-                <PlusIcon className="h-5 w-5 mr-2" />
-                Add New User
-            </button>
-        </div>
+        <select
+          value={sortOption}
+          onChange={(e) => onSortChange(e.target.value as any)}
+          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 transition bg-white"
+        >
+          <option value="name-asc">Sort by Name (A-Z)</option>
+          <option value="name-desc">Sort by Name (Z-A)</option>
+          <option value="fines-asc">Sort by Fines (Low to High)</option>
+          <option value="fines-desc">Sort by Fines (High to Low)</option>
+        </select>
+      </div>
+      <div className="mt-4 hidden md:flex justify-end">
+          <button
+              onClick={onAddUserClick}
+              className="flex items-center bg-indigo-600 text-white font-semibold px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+          >
+              <PlusIcon className="h-5 w-5 mr-2" />
+              Add New User
+          </button>
       </div>
     </div>
   );
