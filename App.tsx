@@ -79,6 +79,14 @@ const App: React.FC = () => {
     const user = users.find(u => u.id === userId);
     if (!user) return;
 
+    const borrowedCount = books.filter(b => b.borrowedById === userId).length;
+    const limit = user.role === 'faculty' ? 10 : 5;
+
+    if (borrowedCount >= limit) {
+      alert(`${user.name} has reached their borrowing limit of ${limit} books.`);
+      return;
+    }
+
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + (user.role === 'faculty' ? 30 : 14));
 
@@ -200,7 +208,7 @@ const App: React.FC = () => {
           <UserFormModal
             isOpen={isUserModalOpen}
             onClose={closeUserModal}
-            onSave={editingUser ? handleUpdateUser : handleAddUser}
+            onSave={editingUser ? handleUpdateUser : handleAddBook}
             initialData={editingUser}
           />
         )}
@@ -209,6 +217,7 @@ const App: React.FC = () => {
                 isOpen={isSelectUserModalOpen}
                 onClose={() => setIsSelectUserModalOpen(false)}
                 users={users}
+                books={books}
                 onSelectUser={handleConfirmBorrow}
             />
         )}

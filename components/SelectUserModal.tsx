@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { User } from '../types';
+import { User, Book } from '../types';
 import { XIcon } from './icons/XIcon';
 import { SearchIcon } from './icons/SearchIcon';
 
@@ -7,10 +7,11 @@ interface SelectUserModalProps {
   isOpen: boolean;
   onClose: () => void;
   users: User[];
+  books: Book[];
   onSelectUser: (userId: number) => void;
 }
 
-const SelectUserModal: React.FC<SelectUserModalProps> = ({ isOpen, onClose, users, onSelectUser }) => {
+const SelectUserModal: React.FC<SelectUserModalProps> = ({ isOpen, onClose, users, books, onSelectUser }) => {
     const [searchTerm, setSearchTerm] = useState('');
 
     const filteredUsers = useMemo(() => {
@@ -49,17 +50,35 @@ const SelectUserModal: React.FC<SelectUserModalProps> = ({ isOpen, onClose, user
         <div className="overflow-y-auto flex-grow">
             {filteredUsers.length > 0 ? (
                 <ul>
-                    {filteredUsers.map(user => (
-                        <li key={user.id}>
-                            <button 
-                                onClick={() => onSelectUser(user.id)}
-                                className="w-full text-left px-5 py-3 hover:bg-indigo-50 transition-colors"
-                            >
-                                <p className="font-semibold text-gray-800">{user.name}</p>
-                                <p className="text-sm text-gray-500 capitalize">{user.role} - ID: {user.id}</p>
-                            </button>
-                        </li>
-                    ))}
+                    {filteredUsers.map(user => {
+                        const borrowedCount = books.filter(b => b.borrowedById === user.id).length;
+                        const limit = user.role === 'faculty' ? 10 : 5;
+                        const hasReachedLimit = borrowedCount >= limit;
+
+                        return (
+                            <li key={user.id}>
+                                <button 
+                                    onClick={() => onSelectUser(user.id)}
+                                    disabled={hasReachedLimit}
+                                    className={`w-full text-left px-5 py-3 transition-colors ${
+                                        hasReachedLimit 
+                                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                                            : 'hover:bg-indigo-50'
+                                    }`}
+                                >
+                                    <div className="flex justify-between items-center">
+                                      <p className={`font-semibold ${hasReachedLimit ? '' : 'text-gray-800'}`}>{user.name}</p>
+                                       {hasReachedLimit && (
+                                            <span className="text-xs font-medium bg-red-100 text-red-700 px-2 py-1 rounded-full">Limit Reached</span>
+                                        )}
+                                    </div>
+                                    <p className="text-sm text-gray-500 capitalize">
+                                        {user.role} - ID: {user.id} | Borrowed: {borrowedCount}/{limit}
+                                    </p>
+                                </button>
+                            </li>
+                        );
+                    })}
                 </ul>
             ) : (
                 <p className="text-center text-gray-500 py-8">No users found.</p>
