@@ -2,6 +2,8 @@ import React from 'react';
 import { Book, User } from '../types';
 import { EditIcon } from './icons/EditIcon';
 import { TrashIcon } from './icons/TrashIcon';
+import { ClockIcon } from './icons/ClockIcon';
+import { formatDueDate } from '../utils/dateUtils';
 
 interface BookCardProps {
   book: Book;
@@ -22,6 +24,7 @@ const BookCard: React.FC<BookCardProps> = ({ book, users, onEdit, onDelete, onBo
     : 'bg-yellow-100 text-yellow-800';
 
   const borrower = !isAvailable ? users.find(u => u.id === borrowedById) : null;
+  const dueDateInfo = formatDueDate(dueDate);
 
   const handleActionClick = () => {
     if (isAvailable) {
@@ -48,9 +51,14 @@ const BookCard: React.FC<BookCardProps> = ({ book, users, onEdit, onDelete, onBo
         <p className="text-sm text-gray-500 mt-1">by {author}</p>
 
         {!isAvailable && borrower && (
-            <div className="mt-3 text-xs text-gray-600 bg-gray-100 p-2 rounded-md">
-                <p><strong>Borrowed by:</strong> {borrower.name}</p>
-                <p><strong>Due on:</strong> {dueDate}</p>
+            <div className="mt-4 text-sm text-gray-700 bg-gray-50 p-3 rounded-lg space-y-2">
+                <div>
+                    <strong>Borrowed by:</strong> {borrower.name}
+                </div>
+                <div className="flex items-center">
+                    <ClockIcon className="h-4 w-4 mr-2 text-gray-500" />
+                    <span className={dueDateInfo.className}>{dueDateInfo.text}</span>
+                </div>
             </div>
         )}
       </div>
