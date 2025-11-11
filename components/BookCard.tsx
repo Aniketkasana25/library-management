@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Book, User } from '../types';
 import { EditIcon } from './icons/EditIcon';
 import { TrashIcon } from './icons/TrashIcon';
 import { ClockIcon } from './icons/ClockIcon';
+import { BookIcon } from './icons/BookIcon';
 import { formatDueDate } from '../utils/dateUtils';
 
 interface BookCardProps {
@@ -15,7 +16,13 @@ interface BookCardProps {
 }
 
 const BookCard: React.FC<BookCardProps> = ({ book, users, onEdit, onDelete, onBorrow, onReturn }) => {
-  const { id, title, author, genre, borrowedById, dueDate } = book;
+  const { id, title, author, genre, coverUrl, borrowedById, dueDate } = book;
+
+  const [imageError, setImageError] = useState(false);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [coverUrl]);
 
   const isAvailable = borrowedById === null;
   
@@ -40,6 +47,20 @@ const BookCard: React.FC<BookCardProps> = ({ book, users, onEdit, onDelete, onBo
     
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden transition-transform transform hover:-translate-y-1 flex flex-col">
+      <div className="relative aspect-[3/4] bg-gray-200">
+        {(coverUrl && !imageError) ? (
+            <img
+                src={coverUrl}
+                alt={`Cover of ${title}`}
+                className="w-full h-full object-cover"
+                onError={() => setImageError(true)}
+            />
+        ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                <BookIcon className="w-16 h-16 text-gray-300" />
+            </div>
+        )}
+      </div>
       <div className="p-5 flex-grow">
         <div className="flex justify-between items-start">
             <p className="text-sm font-medium text-indigo-600">{genre}</p>

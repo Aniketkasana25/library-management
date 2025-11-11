@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { Book, Genre, User } from './types';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { Book, Genre, User, Notification } from './types';
 import { initialBooks } from './data/mockData';
 import { initialUsers } from './data/mockUserData';
 import Header from './components/Header';
@@ -33,6 +33,40 @@ const App: React.FC = () => {
   // Borrowing state
   const [isSelectUserModalOpen, setIsSelectUserModalOpen] = useState(false);
   const [bookToBorrow, setBookToBorrow] = useState<Book | null>(null);
+  
+  // Notification state
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  const checkForOverdueBooks = useCallback(() => {
+      const overdueNotifications: Notification[] = [];
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      books.forEach(book => {
+          if (book.borrowedById && book.dueDate) {
+              const dueDate = new Date(book.dueDate);
+              dueDate.setHours(0,0,0,0);
+              if (today > dueDate) {
+                  const daysOverdue = Math.ceil((today.getTime() - dueDate.getTime()) / (1000 * 3600 * 24));
+                  const user = users.find(u => u.id === book.borrowedById);
+                  if (user) {
+                      overdueNotifications.push({
+                          id: book.id,
+                          bookTitle: book.title,
+                          userName: user.name,
+                          daysOverdue: daysOverdue,
+                      });
+                  }
+              }
+          }
+      });
+      setNotifications(overdueNotifications);
+  }, [books, users]);
+
+  useEffect(() => {
+    checkForOverdueBooks();
+  }, [checkForOverdueBooks]);
+
 
   // Book Management
   const handleAddBook = (book: Omit<Book, 'id' | 'borrowedById' | 'dueDate'>) => {
@@ -46,6 +80,7 @@ const App: React.FC = () => {
   const handleDeleteBook = (id: number) => {
     if (window.confirm('Are you sure you want to delete this book?')) {
         setBooks(prev => prev.filter(b => b.id !== id));
+        setNotifications(prev => prev.filter(n => n.id !== id));
     }
   };
 
@@ -114,6 +149,7 @@ const App: React.FC = () => {
     }
 
     setBooks(books.map(b => b.id === book.id ? { ...b, borrowedById: null, dueDate: null } : b));
+    setNotifications(prev => prev.filter(n => n.id !== book.id));
   };
 
 
@@ -156,7 +192,12 @@ const App: React.FC = () => {
 
   return (
     <div className="bg-gray-50 min-h-screen font-sans text-gray-800">
-      <Header currentView={view} onNavigate={setView} />
+      <Header 
+        currentView={view} 
+        onNavigate={setView} 
+        notifications={notifications}
+        onClearNotifications={() => setNotifications([])}
+      />
       <main className="container mx-auto p-4 md:p-8">
         {view === 'books' ? (
           <>

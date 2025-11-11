@@ -20,23 +20,26 @@ const BookFormModal: React.FC<BookFormModalProps> = ({
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
   const [genre, setGenre] = useState<Genre>(GENRES[0]);
+  const [coverUrl, setCoverUrl] = useState('');
 
   useEffect(() => {
     if (initialData) {
       setTitle(initialData.title);
       setAuthor(initialData.author);
       setGenre(initialData.genre);
+      setCoverUrl(initialData.coverUrl || '');
     } else {
       setTitle('');
       setAuthor('');
       setGenre(GENRES[0]);
+      setCoverUrl('');
     }
   }, [initialData, isOpen]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (title.trim() && author.trim()) {
-      onSave(initialData ? { ...initialData, title, author, genre } : { title, author, genre });
+      onSave(initialData ? { ...initialData, title, author, genre, coverUrl } : { title, author, genre, coverUrl });
       onClose();
     }
   };
@@ -79,6 +82,19 @@ const BookFormModal: React.FC<BookFormModalProps> = ({
                 value={author}
                 onChange={(e) => setAuthor(e.target.value)}
                 required
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label htmlFor="coverUrl" className="block text-sm font-medium text-gray-700">
+                Cover Image URL
+              </label>
+              <input
+                id="coverUrl"
+                type="url"
+                value={coverUrl}
+                onChange={(e) => setCoverUrl(e.target.value)}
+                placeholder="https://example.com/cover.jpg"
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
               />
             </div>
