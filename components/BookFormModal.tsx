@@ -1,8 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Book, Genre } from '../types';
 import { GENRES } from '../constants';
 import { XIcon } from './icons/XIcon';
+import { ImageIcon } from './icons/ImageIcon';
 
 interface BookFormModalProps {
   isOpen: boolean;
@@ -20,21 +21,33 @@ const BookFormModal: React.FC<BookFormModalProps> = ({
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
   const [genre, setGenre] = useState<Genre>(GENRES[0]);
-  const [coverUrl, setCoverUrl] = useState('');
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (initialData) {
       setTitle(initialData.title);
       setAuthor(initialData.author);
       setGenre(initialData.genre);
-      setCoverUrl(initialData.coverUrl || '');
+      setCoverUrl(initialData.coverUrl);
     } else {
       setTitle('');
       setAuthor('');
       setGenre(GENRES[0]);
-      setCoverUrl('');
+      setCoverUrl(null);
     }
   }, [initialData, isOpen]);
+  
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCoverUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,17 +99,43 @@ const BookFormModal: React.FC<BookFormModalProps> = ({
               />
             </div>
             <div>
-              <label htmlFor="coverUrl" className="block text-sm font-medium text-gray-700">
-                Cover Image URL
-              </label>
-              <input
-                id="coverUrl"
-                type="url"
-                value={coverUrl}
-                onChange={(e) => setCoverUrl(e.target.value)}
-                placeholder="https://example.com/cover.jpg"
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-              />
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Book Cover
+                </label>
+                <div className="flex items-center space-x-4">
+                    <div className="w-24 h-36 rounded-md bg-gray-100 flex items-center justify-center overflow-hidden border">
+                        {coverUrl ? (
+                            <img src={coverUrl} alt="Cover preview" className="w-full h-full object-cover" />
+                        ) : (
+                            <ImageIcon className="w-10 h-10 text-gray-300" />
+                        )}
+                    </div>
+                    <div>
+                        <input
+                            type="file"
+                            accept="image/*"
+                            ref={fileInputRef}
+                            onChange={handleImageChange}
+                            className="hidden"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="px-3 py-2 text-sm bg-white text-gray-700 border border-gray-300 rounded-md font-semibold hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        >
+                            Upload Image
+                        </button>
+                        {coverUrl && (
+                            <button
+                                type="button"
+                                onClick={() => setCoverUrl(null)}
+                                className="ml-2 px-3 py-2 text-sm text-red-700 hover:text-red-900 font-medium"
+                            >
+                                Remove
+                            </button>
+                        )}
+                    </div>
+                </div>
             </div>
             <div>
               <label htmlFor="genre" className="block text-sm font-medium text-gray-700">

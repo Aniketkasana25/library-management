@@ -7,7 +7,7 @@ export interface Book {
   title: string;
   author: string;
   genre: Genre;
-  coverUrl?: string;
+  coverUrl: string | null;
   borrowedById: number | null;
   dueDate: string | null;
 }
