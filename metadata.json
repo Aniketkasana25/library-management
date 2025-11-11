@@ -1,0 +1,5 @@
+{
+  "name": "College Library Management",
+  "description": "A modern, responsive web application to manage a college library's book collection. Users can view, search, filter, add, edit, and delete books, as well as manage their borrowing status.",
+  "requestFramePermissions": []
+}
